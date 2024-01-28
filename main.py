@@ -62,7 +62,6 @@ async def parse_cast_message(message: Message) -> None:
     message_without_punctuations = message.text.lower().translate(str.maketrans('', '', string.punctuation))
     data_to_parse = message_without_punctuations.split()
     msg = ''
-    for key, casts in 
     
     await message.reply(text=f'Слышу, слышу. Ты обратился к {msg}')
 

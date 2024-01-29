@@ -4,37 +4,38 @@ import os
 import sys
 import string
 from dotenv import load_dotenv
+from typing import List
 
 from aiogram import Bot, Dispatcher, Router, types
-from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart, CommandObject
+from aiogram.enums import ParseMode, ContentType
+from aiogram.filters import CommandStart, Command
 from aiogram import F
-from aiogram.types import Message, inline_keyboard_markup, inline_keyboard_button, CallbackQuery
+from aiogram.types import (InputMediaPhoto, InputMedia, Message, inline_keyboard_markup,
+                            inline_keyboard_button, CallbackQuery, ContentType as CT)
 from aiogram.utils.markdown import hbold
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
+from aiogram.filters.callback_data import CallbackData
 
+from middlewares import AlbumMiddleware
 from texts.start_message import HELLO_MESSAGE
 from bill.image_to_text import get_text_from_bill
 from callback_cls import CostCallback, OverallCallback
-from aiogram.filters.callback_data import CallbackData
-
+from models import Users, Pings
 
 load_dotenv()
+BILL_DIR = os.getenv('BILLS_DIR')
 # Getting token keep it secure
 TOKEN = os.getenv('BOT_TOKEN')
 # Getting stickers ids
 WORKING = os.getenv('WORKING_STCKR')
+WRONG_TYPE = os.getenv('WRONG_TYPE_STCKR')
+HELLO = os.getenv('HELLO_STICKER')
 bot = Bot(TOKEN, parse_mode=ParseMode.MARKDOWN)
 # Dispatcher is father for handlers
 dp = Dispatcher()
-
+engine = create_async_engine('sqlite+aiosqlite:///bot_db.db', echo=True)
+Session = async_sessionmaker(engine, expire_on_commit=False)
 bill = {}
-pings = {
-    'ефим' : ['Efimkul'],
-    'никита' : ['WhiteChewy'],
-    'бай' : ['меня'],
-    'куликовы': ['Efimkul', 'WhiteChewy'],
-    'все': ['Efimkul', 'WhiteChewy', 'marmota_bobak_bot']
-}
 
 
 @dp.message(CommandStart())
@@ -44,6 +45,7 @@ async def command_start_handler(message: Message) -> None:
     :param message: Message object
     :type message: aiogram.types.Message
     """
+    await message.reply_sticker(HELLO)
     await message.answer(HELLO_MESSAGE)
 
 
@@ -72,36 +74,48 @@ async def parse_bot_command(message: Message) -> None:
     pass
 
 
-@dp.message(F.photo)
-async def check_to_str(message: Message) -> None:
+@dp.message(F.content_type.in_([CT.PHOTO, CT.VIDEO, CT.AUDIO, CT.DOCUMENT]))
+async def check_to_str(message: Message, album: List[Message]) -> None:
     """Handler wich recive message with photos"""
-    send_message_id = await message.answer_sticker(sticker=WORKING, disable_notification=True)
-    text_from_bill = get_text_from_bill(number_of_images=2)
-    await send_message_id.delete()
-    msg_text = 'Вот ваш счет'
-    keyboard_buttons = []
-    for key in text_from_bill:
-        key_line = inline_keyboard_button.InlineKeyboardButton(
-            text=key,
-            callback_data=CostCallback(name='cost', cost=text_from_bill[key]).pack(),
+    if message.content_type != ContentType.PHOTO:
+        await message.reply_sticker(WRONG_TYPE, disable_notification=True)
+        await message.answer(text=f'Уважаемый @{message.from_user.username}, вы должны были отправить фотографии чека с Бахромы... Но я что то их не наблюдаю.')
+    else:
+        send_message_id = await message.reply_sticker(sticker=WORKING, disable_notification=True)
+        # Getting file_ids from media group 
+        media_group = []
+        for msg in album:
+            if msg.photo:
+                file_id = msg.photo[-1].file_id
+                media_group.append(file_id)
+        for index, elem in enumerate(media_group):
+            await bot.download(elem, f'{BILL_DIR}/{index}.jpg')
+        text_from_bill = get_text_from_bill(number_of_images=len(media_group))
+        await send_message_id.delete()
+        msg_text = 'Вот ваш счет'
+        keyboard_buttons = []
+        for key in text_from_bill:
+            key_line = inline_keyboard_button.InlineKeyboardButton(
+                text=key,
+                callback_data=CostCallback(name='cost', cost=text_from_bill[key]).pack(),
+            )
+            keyboard_buttons.append([key_line])
+        overall = inline_keyboard_button.InlineKeyboardButton(
+            text='Посчитай пожалуйста',
+            callback_data=OverallCallback(text='overall').pack(),
         )
-        keyboard_buttons.append([key_line])
-    overall = inline_keyboard_button.InlineKeyboardButton(
-        text='Посчитай пожалуйста',
-        callback_data=OverallCallback(text='overall').pack(),
-    )
-    keyboard_buttons.append([overall])
-    keyboard = inline_keyboard_markup.InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+        keyboard_buttons.append([overall])
+        keyboard = inline_keyboard_markup.InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
 
-    await message.answer(text=msg_text, reply_markup=keyboard)
+        await message.answer(text=msg_text, reply_markup=keyboard)
 
 
 @dp.callback_query(OverallCallback.filter(F.text == 'overall'))
 async def print_overall(query: CallbackQuery, callback_data: CallbackData, bot: Bot):
     await query.answer()
     user_name = query.from_user.username
-    bill.pop(user_name, '')
     await bot.send_message(query.message.chat.id, text=f'@{user_name}, вы потратили: {bill[user_name]} Р')
+    bill.pop(user_name, '')
 
 
 @dp.callback_query(CostCallback.filter(F.name == 'cost'))
@@ -127,7 +141,8 @@ async def calculate_callbacks(query: CallbackQuery, callback_data: CostCallback)
     logging.info('%s нажал на товар со стоймостью: %s', user_name, cost)
 
 async def main() -> None:
-    await dp.start_polling(bot)
+    dp.message.middleware(AlbumMiddleware())
+    await dp.start_polling(bot, skip_updates=True)
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import re
 import sys
 import string
 from dotenv import load_dotenv
@@ -19,23 +20,30 @@ from aiogram.filters.callback_data import CallbackData
 from middlewares import AlbumMiddleware
 from texts.start_message import HELLO_MESSAGE
 from bill.image_to_text import get_text_from_bill
-from callback_cls import CostCallback, OverallCallback
+from callback_cls import CostCallback, OverallCallback, NoneButton, LeftButton, RightButton
 from models import Users, Pings
+from utils.keyboard import create_keyboard_for_bill
 
 load_dotenv()
+# working with bill
 BILL_DIR = os.getenv('BILLS_DIR')
+PER_PAGE = int(os.getenv('KEYBOARD_CAPACITY'))
 # Getting token keep it secure
 TOKEN = os.getenv('BOT_TOKEN')
 # Getting stickers ids
 WORKING = os.getenv('WORKING_STCKR')
 WRONG_TYPE = os.getenv('WRONG_TYPE_STCKR')
 HELLO = os.getenv('HELLO_STICKER')
+# Bot object
 bot = Bot(TOKEN, parse_mode=ParseMode.MARKDOWN)
 # Dispatcher is father for handlers
 dp = Dispatcher()
+# Database (aio SQLite3)
 engine = create_async_engine('sqlite+aiosqlite:///bot_db.db', echo=True)
 Session = async_sessionmaker(engine, expire_on_commit=False)
+# globals
 bill = {}
+all_inline_keys = []
 
 
 @dp.message(CommandStart())
@@ -77,10 +85,9 @@ async def parse_bot_command(message: Message) -> None:
 @dp.message(F.content_type.in_([CT.PHOTO, CT.VIDEO, CT.AUDIO, CT.DOCUMENT]))
 async def check_to_str(message: Message, album: List[Message]) -> None:
     """Handler wich recive message with photos"""
-    if message.content_type != ContentType.PHOTO:
-        await message.reply_sticker(WRONG_TYPE, disable_notification=True)
-        await message.answer(text=f'Уважаемый @{message.from_user.username}, вы должны были отправить фотографии чека с Бахромы... Но я что то их не наблюдаю.')
-    else:
+    global all_inline_keys
+    ping_re = re.compile(r'(слыш)ь*(,)* *бай(,)* посчитай(те)*|ув(а|о)жаемы(й|е)(,)* *бай посчитай(те)*|/bill')
+    if message.caption and re.search(ping_re, message.caption.lower()):
         send_message_id = await message.reply_sticker(sticker=WORKING, disable_notification=True)
         # Getting file_ids from media group 
         media_group = []
@@ -92,29 +99,119 @@ async def check_to_str(message: Message, album: List[Message]) -> None:
             await bot.download(elem, f'{BILL_DIR}/{index}.jpg')
         text_from_bill = get_text_from_bill(number_of_images=len(media_group))
         await send_message_id.delete()
-        msg_text = 'Вот ваш счет'
-        keyboard_buttons = []
-        for key in text_from_bill:
-            key_line = inline_keyboard_button.InlineKeyboardButton(
-                text=key,
-                callback_data=CostCallback(name='cost', cost=text_from_bill[key]).pack(),
-            )
-            keyboard_buttons.append([key_line])
-        overall = inline_keyboard_button.InlineKeyboardButton(
-            text='Посчитай пожалуйста',
+        msg_text = '''Вот ваш счет.
+        Пожалуйста выберете что вы хотите посчитать'''
+        all_inline_keys = await create_keyboard_for_bill(text_from_bill)
+        total_pages = (len(all_inline_keys) // PER_PAGE) + 1
+        prev = inline_keyboard_button.InlineKeyboardButton(
+            text='X',
+            callback_data=NoneButton(name="why_it_cant_be_none_jesus").pack(),
+        )
+        mid = inline_keyboard_button.InlineKeyboardButton(
+            text=f'1 из {total_pages}',
+            callback_data=NoneButton(name="ffs_why_i_must_do_this").pack(),
+        )
+        next = inline_keyboard_button.InlineKeyboardButton(
+            text = '>',
+            callback_data=RightButton(name='right', page_number=1).pack(),
+        )
+        pay = inline_keyboard_button.InlineKeyboardButton(
+            text='Посчитать без скидки',
             callback_data=OverallCallback(text='overall').pack(),
         )
-        keyboard_buttons.append([overall])
-        keyboard = inline_keyboard_markup.InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
-
+        pay_discount = inline_keyboard_button.InlineKeyboardButton(
+            text='Посчитать со скидкой',
+            callback_data=OverallCallback(text='overall_discount').pack(),
+        )
+        keyboard = inline_keyboard_markup.InlineKeyboardMarkup(
+            inline_keyboard=(all_inline_keys[:PER_PAGE]+[[prev, mid, next]]+[[pay, pay_discount]])
+        )
         await message.answer(text=msg_text, reply_markup=keyboard)
 
 
+@dp.callback_query(RightButton.filter(F.name == 'right'))
+async def next_page(query: CallbackQuery, callback_data: RightButton):
+    await query.answer()
+    global all_inline_keys
+    total_pages = (len(all_inline_keys) // PER_PAGE) + 1
+    multiplier = callback_data.page_number
+    prev = inline_keyboard_button.InlineKeyboardButton(
+        text='<',
+        callback_data=LeftButton(name="left", page_number=multiplier-1).pack(),
+    )
+    mid = inline_keyboard_button.InlineKeyboardButton(
+        text=f'{callback_data.page_number+1} из {total_pages}',
+        callback_data=NoneButton(name="i_hate_that_it_cant_be_none").pack(),
+    )
+    if total_pages < multiplier-1:
+        next = inline_keyboard_button.InlineKeyboardButton(
+            text = '>',
+            callback_data=RightButton(name='right', page_number=multiplier+1).pack(),
+        )
+    else:
+        next = inline_keyboard_button.InlineKeyboardButton(
+            text = 'X',
+            callback_data=NoneButton(name='AGAIN_ARGHHHHHH').pack(),
+        )
+    pay = inline_keyboard_button.InlineKeyboardButton(
+        text='Посчитать без скидки',
+        callback_data=OverallCallback(text='overall').pack(),
+    )
+    pay_discount = inline_keyboard_button.InlineKeyboardButton(
+        text='Посчитать со скидкой',
+        callback_data=OverallCallback(text='overall_discount').pack(),
+    )
+    keyboard = inline_keyboard_markup.InlineKeyboardMarkup(
+        inline_keyboard=(all_inline_keys[PER_PAGE*multiplier:PER_PAGE*multiplier+PER_PAGE]+[[prev, mid, next]]+[[pay, pay_discount]])
+        )
+    await query.message.edit_reply_markup(reply_markup=keyboard)
+
+
+@dp.callback_query(LeftButton.filter(F.name == "left"))
+async def next_page(query: CallbackQuery, callback_data: RightButton):
+    await query.answer()
+    global all_inline_keys
+    total_pages = (len(all_inline_keys) // PER_PAGE) + 1
+    multiplier = callback_data.page_number
+    if multiplier != 0:
+        prev = inline_keyboard_button.InlineKeyboardButton(
+            text='<',
+            callback_data=LeftButton(name="left", page_number=multiplier-1).pack(),
+        )
+    else:
+        prev = inline_keyboard_button.InlineKeyboardButton(
+            text = 'X',
+            callback_data=NoneButton(name='JESUS_CRIST_ITS_NONE').pack(),
+        )
+    mid = inline_keyboard_button.InlineKeyboardButton(
+        text=f'{callback_data.page_number+1} из {total_pages}',
+        callback_data=NoneButton(name="i_hate_that_it_cant_be_none").pack(),
+    )
+    next = inline_keyboard_button.InlineKeyboardButton(
+        text = '>',
+        callback_data=RightButton(name='right', page_number=multiplier+1).pack(),
+    )
+    pay = inline_keyboard_button.InlineKeyboardButton(
+        text='Посчитать без скидки',
+        callback_data=OverallCallback(text='overall').pack(),
+    )
+    pay_discount = inline_keyboard_button.InlineKeyboardButton(
+        text='Посчитать со скидкой',
+        callback_data=OverallCallback(text='overall_discount').pack(),
+    )
+    keyboard = inline_keyboard_markup.InlineKeyboardMarkup(
+        inline_keyboard=(all_inline_keys[PER_PAGE*multiplier:PER_PAGE*multiplier+PER_PAGE]+[[prev, mid, next]]+[[pay, pay_discount]])
+        )
+    await query.message.edit_reply_markup(reply_markup=keyboard)
+
+
+@dp.callback_query(OverallCallback.filter(F.text == 'overall_discount'))
 @dp.callback_query(OverallCallback.filter(F.text == 'overall'))
 async def print_overall(query: CallbackQuery, callback_data: CallbackData, bot: Bot):
     await query.answer()
     user_name = query.from_user.username
-    await bot.send_message(query.message.chat.id, text=f'@{user_name}, вы потратили: {bill[user_name]} Р')
+    price = bill[user_name] if callback_data.text == 'overall' else bill[user_name]/2
+    await bot.send_message(query.message.chat.id, text=f'@{user_name}, вы потратили: {price} Р')
     bill.pop(user_name, '')
 
 

@@ -143,7 +143,7 @@ async def next_page(query: CallbackQuery, callback_data: RightButton):
         text=f'{callback_data.page_number+1} из {total_pages}',
         callback_data=NoneButton(name="i_hate_that_it_cant_be_none").pack(),
     )
-    if total_pages < multiplier-1:
+    if total_pages > multiplier-1:
         next = inline_keyboard_button.InlineKeyboardButton(
             text = '>',
             callback_data=RightButton(name='right', page_number=multiplier+1).pack(),

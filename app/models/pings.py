@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import INTEGER, VARCHAR
+from sqlalchemy import INTEGER, VARCHAR, ForeignKey
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 
 from .base import Base
@@ -17,4 +17,5 @@ class Pings(Base):
     
     id: Mapped[int] = mapped_column(INTEGER, primary_key=True, autoincrement=True)
     ping_name: Mapped[str] = mapped_column(VARCHAR(length=255))
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
     user: Mapped['Users'] = relationship(back_populates='pings')

@@ -16,4 +16,5 @@ class Users(Base):
 
     id: Mapped[int] = mapped_column(INTEGER, primary_key=True, autoincrement=True)
     nickname: Mapped[str] = mapped_column(VARCHAR(length=255))
+    telegram_id: Mapped[int] = mapped_column(INTEGER, unique=True)
     pings: Mapped[List['Pings']] =  relationship()

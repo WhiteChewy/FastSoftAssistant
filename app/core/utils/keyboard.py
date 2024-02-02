@@ -1,10 +1,10 @@
-from typing import Dict
+from typing import Dict, List
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types.inline_keyboard_button import InlineKeyboardButton
 from callback_cls import CostCallback
 
 
-async def create_keyboard_for_bill(lines: Dict[str, int]) -> InlineKeyboardMarkup:
+async def create_keyboard_for_bill(lines: Dict[str, int]) -> List:
     """Creating Inline Keyboard Markup for bill.
 
     :param lines: Dict of position names

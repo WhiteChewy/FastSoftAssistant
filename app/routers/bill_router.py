@@ -14,7 +14,7 @@ from aiogram.filters.callback_data import CallbackData
 from core.bill_utils.image_to_text import get_text_from_bill
 from callback_cls import CostCallback, OverallCallback, NoneButton, LeftButton, RightButton
 from core.utils.keyboard import create_keyboard_for_bill
-from core.bot import bot
+from core.bot import BOT_OBJ
 
 load_dotenv()
 # working with bill
@@ -28,12 +28,13 @@ WRONG_TYPE = os.getenv('WRONG_TYPE_STCKR')
 HELLO = os.getenv('HELLO_STICKER')
 # Routers is father for handlers
 BILL_ROUTER = Router()
+bot = BOT_OBJ
 # globals
 bill = {}
 all_inline_keys = []
 
 
-@BILL_ROUTER.message(F.content_type.in_([CT.PHOTO, CT.VIDEO, CT.AUDIO, CT.DOCUMENT]))
+@BILL_ROUTER.message(F.content_type.in_([CT.PHOTO]))
 async def check_to_str(message: Message, album: List[Message]) -> None:
     """Handler wich recive message with media group."""
     global all_inline_keys
@@ -74,8 +75,9 @@ async def check_to_str(message: Message, album: List[Message]) -> None:
             text='Посчитать со скидкой',
             callback_data=OverallCallback(text='overall_discount').pack(),
         )
+        list_of_buttons = all_inline_keys[:PER_PAGE]+[[prev, mid, next]]+[[pay, pay_discount]]
         keyboard = inline_keyboard_markup.InlineKeyboardMarkup(
-            inline_keyboard=(all_inline_keys[:PER_PAGE]+[[prev, mid, next]]+[[pay, pay_discount]])
+            inline_keyboard=list_of_buttons
         )
         await message.answer(text=msg_text, reply_markup=keyboard)
 
@@ -113,8 +115,9 @@ async def next_page(query: CallbackQuery, callback_data: RightButton):
         text='Посчитать со скидкой',
         callback_data=OverallCallback(text='overall_discount').pack(),
     )
+    all_buttons = all_inline_keys[PER_PAGE*multiplier:PER_PAGE*multiplier+PER_PAGE]+[[prev, mid, next]]+[[pay, pay_discount]]
     keyboard = inline_keyboard_markup.InlineKeyboardMarkup(
-        inline_keyboard=(all_inline_keys[PER_PAGE*multiplier:PER_PAGE*multiplier+PER_PAGE]+[[prev, mid, next]]+[[pay, pay_discount]])
+        inline_keyboard=all_buttons
         )
     await query.message.edit_reply_markup(reply_markup=keyboard)
 
@@ -152,8 +155,9 @@ async def next_page(query: CallbackQuery, callback_data: RightButton):
         text='Посчитать со скидкой',
         callback_data=OverallCallback(text='overall_discount').pack(),
     )
+    all_buttons = all_inline_keys[PER_PAGE*multiplier:PER_PAGE*multiplier+PER_PAGE]+[[prev, mid, next]]+[[pay, pay_discount]]
     keyboard = inline_keyboard_markup.InlineKeyboardMarkup(
-        inline_keyboard=(all_inline_keys[PER_PAGE*multiplier:PER_PAGE*multiplier+PER_PAGE]+[[prev, mid, next]]+[[pay, pay_discount]])
+        inline_keyboard=all_buttons,
         )
     await query.message.edit_reply_markup(reply_markup=keyboard)
 
@@ -167,7 +171,7 @@ async def none_presse(query: CallbackQuery, callback_data: RightButton) -> None:
 
 @BILL_ROUTER.callback_query(OverallCallback.filter(F.text == 'overall_discount'))
 @BILL_ROUTER.callback_query(OverallCallback.filter(F.text == 'overall'))
-async def print_overall(query: CallbackQuery, callback_data: CallbackData, bot: Bot):
+async def print_overall(query: CallbackQuery, callback_data: CallbackData):
     await query.answer()
     user_name = query.from_user.username
     price = bill[user_name] if callback_data.text == 'overall' else bill[user_name]/2

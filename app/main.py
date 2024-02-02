@@ -42,29 +42,10 @@ async def command_start_handler(message: Message) -> None:
     await message.answer(HELLO_MESSAGE)
 
 
-@dp.message(F.text.lower().regexp(r'(слыш)ь*(,)* |ув(а|о)жаемы(й|е)(,)* '))
-async def parse_cast_message(message: Message) -> None:
-    """Ping persons in chat.
-
-    Ping user in chat due to saved ping name. Name saved in database. And added by another command.
-
-    :param message: Message that trigger filter
-    :type message: aiogram.types.Message
-
-    :return: Nothong
-    :rtype: None
-    """
-    message_without_punctuations = message.text.lower().translate(str.maketrans('', '', string.punctuation))
-    data_to_parse = message_without_punctuations.split()
-    msg = ''
-    
-    await message.reply(text=f'Слышу, слышу. Ты обратился к {msg}')
-
-
-@dp.message(F.text.lower().regexp(r'(слыш)ь*(,)* *бай|ув(а|о)жаемы(й|е) *бай'))
-async def parse_bot_command(message: Message) -> None:
-    """Parse human-like commands."""
-    pass
+# @dp.message(F.text.lower().regexp(r'(слыш)ь*(,)* *бай|ув(а|о)жаемы(й|е) *бай'))
+# async def parse_bot_command(message: Message) -> None:
+#     """Parse human-like commands."""
+#     pass
 
 
 async def main() -> None:

@@ -18,4 +18,5 @@ class Pings(Base):
     id: Mapped[int] = mapped_column(INTEGER, primary_key=True, autoincrement=True)
     ping_name: Mapped[str] = mapped_column(VARCHAR(length=255))
     user_id: Mapped[int] = mapped_column(ForeignKey('users.id'))
+    count: Mapped[int] = mapped_column(INTEGER)
     user: Mapped['Users'] = relationship(back_populates='pings')

@@ -113,7 +113,7 @@ def get_text_from_image(image_path: pathlib.Path) -> List[str]:
     filtered_lines = lines[begining_of_bill_index+1:]
     begin = 0
     for index, elem in enumerate(filtered_lines):
-        if elem.spli()[0].isdigit():
+        if elem.split()[0].isdigit():
             continue
         else:
             begin = index + 2

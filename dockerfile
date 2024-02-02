@@ -1,4 +1,4 @@
-FROM python:3.11.70slim-bullseye
+FROM python:3.11.7-bullseye
 RUN mkdir -p /fs_assistant
 WORKDIR /fs_assistant
 ENV PYTHONPATH "${PYTHONPATH}:/"
@@ -19,6 +19,4 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY . /fs_assistant/
 
-RUN chmod +x main.py
-
-CMD ["python3.11", "main.py"]
+CMD ["python3.11", "app/main.py"]

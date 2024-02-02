@@ -30,7 +30,7 @@ bot = BOT_OBJ
 dp = Dispatcher()
 
 
-
+@dp.message(F.text.lower().regexp(r'(слыш)ь*(,)* *бай *ра(с)*скажи(те)* *о *себе|ув(а|о)жаемы(й|е) *бай(,)* *расскажи(те)* *о *себе'))
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
     """Handler wich rescive messages with `/start` command
@@ -40,13 +40,6 @@ async def command_start_handler(message: Message) -> None:
     """
     await message.reply_sticker(HELLO)
     await message.answer(HELLO_MESSAGE)
-
-
-# @dp.message(F.text.lower().regexp(r'(слыш)ь*(,)* *бай|ув(а|о)жаемы(й|е) *бай'))
-# async def parse_bot_command(message: Message) -> None:
-#     """Parse human-like commands."""
-#     pass
-
 
 async def main() -> None:
     dp.message.middleware(AlbumMiddleware())

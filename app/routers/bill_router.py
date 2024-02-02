@@ -163,7 +163,7 @@ async def next_page(query: CallbackQuery, callback_data: RightButton):
 
 
 
-@BILL_ROUTER.callback_query(NoneButton)
+@BILL_ROUTER.callback_query(NoneButton.filter())
 async def none_presse(query: CallbackQuery, callback_data: RightButton) -> None:
     """do nothing if none button  was pressed."""
     await query.answer()

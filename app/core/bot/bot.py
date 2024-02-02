@@ -7,4 +7,4 @@ from aiogram.enums import ParseMode
 dotenv.load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
-BOT_OBJ = Bot(TOKEN, parse_mode=ParseMode.MARKDOWN)
+BOT_OBJ = Bot(TOKEN)

@@ -111,6 +111,16 @@ def get_text_from_image(image_path: pathlib.Path) -> List[str]:
     lines = [line for _, line, _ in extract_text]
     begining_of_bill_index = lines.index('Мой счёт')
     filtered_lines = lines[begining_of_bill_index+1:]
+    begin = 0
+    for index, elem in enumerate(filtered_lines):
+        if elem.spli()[0].isdigit():
+            continue
+        else:
+            begin = index + 2
+            break
+    if begin:
+        filtered_lines = filtered_lines[begin:]
+            
     return filtered_lines
 
 

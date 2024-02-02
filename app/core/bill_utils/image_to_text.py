@@ -53,7 +53,7 @@ def filter_only_dishes(raw_text: List[str]):
         else:
             to_add = result if result != '' else None
             if to_add:
-                dishes.append(result)
+                dishes.append(result[1:])
                 result = ''
     return dishes
 
@@ -92,7 +92,7 @@ def filter_cost(numbers: List[str]) -> List[int]:
 
     for elem in numbers:
         index = elem.lower().find(' ₽')
-        number = elem[:index]
+        number = elem[:index].replace(' ', '')
         result.append(int(number))
     
     return result
@@ -150,6 +150,11 @@ def get_text_from_bill(image_dir: str=None, number_of_images: int=None) -> Dict[
             only_cost.append(elem)
         elif line_class == 'number':
             only_numbers.append(elem)
+    
     only_numbers = filter_numbers(only_numbers)
     only_cost = filter_cost(only_cost)
-    return {dish: cost/number for dish, cost, number in zip(only_dishes, only_cost, only_numbers)}
+    result = {dish: cost/number for dish, cost, number in zip(only_dishes, only_cost, only_numbers)}
+    result.pop('Скидка', '')
+    result.pop('Итого', '')
+    result.pop('Всего', '')
+    return result

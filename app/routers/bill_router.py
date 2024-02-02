@@ -27,6 +27,7 @@ TOKEN = os.getenv('BOT_TOKEN')
 WORKING = os.getenv('WORKING_STCKR')
 WRONG_TYPE = os.getenv('WRONG_TYPE_STCKR')
 HELLO = os.getenv('HELLO_STICKER')
+LOGS_CHAT = os.getenv('LOGS_CHAT')
 # Routers is father for handlers
 BILL_ROUTER = Router()
 bot = BOT_OBJ
@@ -55,8 +56,11 @@ async def check_to_str(message: Message, album: List[Message]) -> None:
             media_group.append(file_id)
         for index, elem in enumerate(media_group):
             await bot.download(elem, f'{BILL_DIR}/{index}.jpg')
-        text_from_bill = get_text_from_bill(number_of_images=len(media_group))
-        await send_message_id.delete()
+        try:
+            text_from_bill = get_text_from_bill(number_of_images=len(media_group))
+            await send_message_id.delete()
+        except Exception as error:
+            await bot.send_message(chat_id=int(LOGS_CHAT), text=f'DURING EXTRACTION TEXT FROM IMAGE ERROR OCCURED.\n\nError {error}')
         msg_text = '''Вот ваш счет.
         Пожалуйста выберете что вы хотите посчитать'''
         all_inline_keys = await create_keyboard_for_bill(text_from_bill)

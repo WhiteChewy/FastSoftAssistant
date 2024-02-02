@@ -17,7 +17,7 @@ class AlbumMiddleware(BaseMiddleware):
             message: Message,
             data: dict[str, Any]
     ) -> Any:
-        if not message.media_group_id and message.content_type != ContentType.PHOTO:
+        if not message.media_group_id  and message.content_type != ContentType.PHOTO:
             await handler(message, data)
             return
         try:

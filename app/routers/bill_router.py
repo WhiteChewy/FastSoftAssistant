@@ -34,54 +34,58 @@ bot = BOT_OBJ
 bill = {}
 all_inline_keys = []
 
-@BILL_ROUTER.message(F.content_type == CT.PHOTO, CheckMessage())
+
+# Здесь можно было бы спрятать проверку на re.compile в кастомный класс фильтр, НО тогда неверно отрабатывает middleware
+@BILL_ROUTER.message(F.content_type.in_([CT.PHOTO]))
 async def check_to_str(message: Message, album: List[Message]) -> None:
     """Handler wich recive message with media group."""
     global all_inline_keys
-    send_message_id = await message.reply_sticker(sticker=WORKING, disable_notification=True)
-    # Getting file_ids from media group 
-    media_group = []
-    if message.media_group_id:
-        for msg in album:
-            if msg.photo:
-                file_id = msg.photo[-1].file_id
-                media_group.append(file_id)
-    else:
-        file_id = message.photo[-1].file_id
-        media_group.append(file_id)
-    for index, elem in enumerate(media_group):
-        await bot.download(elem, f'{BILL_DIR}/{index}.jpg')
-    text_from_bill = get_text_from_bill(number_of_images=len(media_group))
-    await send_message_id.delete()
-    msg_text = '''Вот ваш счет.
-    Пожалуйста выберете что вы хотите посчитать'''
-    all_inline_keys = await create_keyboard_for_bill(text_from_bill)
-    total_pages = (len(all_inline_keys) // PER_PAGE) + 1
-    # prev = inline_keyboard_button.InlineKeyboardButton(
-    #     text='X',
-    #     callback_data=NoneButton(name="why_it_cant_be_none_jesus").pack(),
-    # )
-    # mid = inline_keyboard_button.InlineKeyboardButton(
-    #     text=f'1 из {total_pages}',
-    #     callback_data=NoneButton(name="ffs_why_i_must_do_this").pack(),
-    # )
-    # next = inline_keyboard_button.InlineKeyboardButton(
-    #     text = '>',
-    #     callback_data=RightButton(name='right', page_number=1).pack(),
-    # )
-    pay = inline_keyboard_button.InlineKeyboardButton(
-        text='Посчитать без скидки',
-        callback_data=OverallCallback(text='overall').pack(),
-    )
-    pay_discount = inline_keyboard_button.InlineKeyboardButton(
-        text='Посчитать со скидкой',
-        callback_data=OverallCallback(text='overall_discount').pack(),
-    )
-    list_of_buttons = all_inline_keys[:PER_PAGE]+[[pay, pay_discount]]
-    keyboard = inline_keyboard_markup.InlineKeyboardMarkup(
-        inline_keyboard=list_of_buttons
-    )
-    await message.answer(text=msg_text, reply_markup=keyboard)
+    ping_re = re.compile(r'(слыш)ь*(,)* *бай(,)* посчитай(те)*|ув(а|о)жаемы(й|е)(,)* *бай *(по|рас)считай(те)*')
+    if ping_re:
+        send_message_id = await message.reply_sticker(sticker=WORKING, disable_notification=True)
+        # Getting file_ids from media group 
+        media_group = []
+        if message.media_group_id:
+            for msg in album:
+                if msg.photo:
+                    file_id = msg.photo[-1].file_id
+                    media_group.append(file_id)
+        else:
+            file_id = message.photo[-1].file_id
+            media_group.append(file_id)
+        for index, elem in enumerate(media_group):
+            await bot.download(elem, f'{BILL_DIR}/{index}.jpg')
+        text_from_bill = get_text_from_bill(number_of_images=len(media_group))
+        await send_message_id.delete()
+        msg_text = '''Вот ваш счет.
+        Пожалуйста выберете что вы хотите посчитать'''
+        all_inline_keys = await create_keyboard_for_bill(text_from_bill)
+        total_pages = (len(all_inline_keys) // PER_PAGE) + 1
+        # prev = inline_keyboard_button.InlineKeyboardButton(
+        #     text='X',
+        #     callback_data=NoneButton(name="why_it_cant_be_none_jesus").pack(),
+        # )
+        # mid = inline_keyboard_button.InlineKeyboardButton(
+        #     text=f'1 из {total_pages}',
+        #     callback_data=NoneButton(name="ffs_why_i_must_do_this").pack(),
+        # )
+        # next = inline_keyboard_button.InlineKeyboardButton(
+        #     text = '>',
+        #     callback_data=RightButton(name='right', page_number=1).pack(),
+        # )
+        pay = inline_keyboard_button.InlineKeyboardButton(
+            text='Посчитать без скидки',
+            callback_data=OverallCallback(text='overall').pack(),
+        )
+        pay_discount = inline_keyboard_button.InlineKeyboardButton(
+            text='Посчитать со скидкой',
+            callback_data=OverallCallback(text='overall_discount').pack(),
+        )
+        list_of_buttons = all_inline_keys[:PER_PAGE]+[[pay, pay_discount]]
+        keyboard = inline_keyboard_markup.InlineKeyboardMarkup(
+            inline_keyboard=list_of_buttons
+        )
+        await message.answer(text=msg_text, reply_markup=keyboard)
 
 
 @BILL_ROUTER.callback_query(RightButton.filter(F.name == 'right'))

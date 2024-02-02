@@ -146,6 +146,7 @@ async def add_ping(message: Message) -> None:
 ```
 '''
         )
+        return
     new_ping = Pings(
         ping_name = ping,
         user_id=user.id,

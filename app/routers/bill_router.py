@@ -2,19 +2,19 @@ import logging
 import os
 import re
 from dotenv import load_dotenv
-from typing import List
+from typing import List, Dict
 
 from aiogram import Bot, Router
 from aiogram.enums import ParseMode
 from aiogram import F
 from aiogram.types import (Message, inline_keyboard_markup, inline_keyboard_button,
 CallbackQuery, ContentType as CT)
+from aiogram.types.inline_keyboard_button import InlineKeyboardButton
 from aiogram.filters.callback_data import CallbackData
 
 from core.filter.check_message import CheckMessage
 from core.bill_utils.image_to_text import get_text_from_bill
 from callback_cls import CostCallback, OverallCallback, NoneButton, LeftButton, RightButton
-from core.utils.keyboard import create_keyboard_for_bill
 from core.bot import BOT_OBJ
 
 load_dotenv()
@@ -34,7 +34,28 @@ bot = BOT_OBJ
 # globals
 bill = {}
 all_inline_keys = []
+tags = []
 
+async def create_keyboard_for_bill(lines: Dict[str, int]) -> List:
+    """Creating Inline Keyboard Markup for bill.
+
+    :param lines: Dict of position names
+    :type lines: Dict[str]
+
+    :return:  Inline keyboard markup with positions from bills
+    :rtype: aiogram.types.InlineKeyboardMarkup
+    """
+    result = []
+    for key in lines:
+        tags.append(key)
+        index = tags.index(key)
+        key_line = InlineKeyboardButton(
+            text=key,
+            callback_data=CostCallback(name='cost', pos_name=index, cost=lines[key]).pack(),
+        )
+        result.append([key_line])
+
+    return result
 
 # Здесь можно было бы спрятать проверку на re.compile в кастомный класс фильтр, НО тогда неверно отрабатывает middleware
 @BILL_ROUTER.message(F.content_type.in_([CT.PHOTO]))
@@ -63,6 +84,7 @@ async def check_to_str(message: Message, album: List[Message]) -> None:
             await bot.send_message(chat_id=int(LOGS_CHAT), text=f'DURING EXTRACTION TEXT FROM IMAGE ERROR OCCURED.\n\nError {error}')
         msg_text = '''Вот ваш счет.
         Пожалуйста выберете что вы хотите посчитать'''
+        tags = list(text_from_bill.keys())
         all_inline_keys = await create_keyboard_for_bill(text_from_bill)
         total_pages = (len(all_inline_keys) // PER_PAGE) + 1
         # prev = inline_keyboard_button.InlineKeyboardButton(
@@ -208,7 +230,7 @@ async def calculate_callbacks(query: CallbackQuery, callback_data: CostCallback)
     :rtype: 
     """
     await query.answer()
-    position = callback_data.pos_name
+    position = tags[callback_data.pos_name]
     cost = callback_data.cost
     user_name = query.from_user.username
     if user_name in bill:

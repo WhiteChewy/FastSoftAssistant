@@ -184,7 +184,13 @@ async def print_overall(query: CallbackQuery, callback_data: CallbackData):
     await query.answer()
     user_name = query.from_user.username
     price = bill[user_name] if callback_data.text == 'overall' else bill[user_name]/2
-    await bot.send_message(query.message.chat.id, text=f'@{user_name}, вы потратили: {price} Р')
+    message_for_user = '```\n'
+    for pos, pos_price in bill[user_name]:
+        if pos == 'total':
+            continue
+        message_for_user += f'{pos}: {pos_price} RUB\n'
+    message_for_user += f'```\n *Итого*: {price}'
+    await bot.send_message(query.message.chat.id, text=f'@{user_name}, ваш чек:\n{message_for_user}')
     bill.pop(user_name, '')
 
 
@@ -202,10 +208,12 @@ async def calculate_callbacks(query: CallbackQuery, callback_data: CostCallback)
     :rtype: 
     """
     await query.answer()
+    position = callback_data.pos_name
     cost = callback_data.cost
     user_name = query.from_user.username
     if user_name in bill:
-        bill[user_name] += cost
+        bill[user_name].update({position: cost})
+        bill[user_name]['total'] += cost
     else:
-        bill[user_name] = cost
+        bill[user_name] = {position: cost, 'total': cost}
     logging.info('%s нажал на товар со стоймостью: %s', user_name, cost)

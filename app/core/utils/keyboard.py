@@ -17,7 +17,7 @@ async def create_keyboard_for_bill(lines: Dict[str, int]) -> List:
     for key in lines:
         key_line = InlineKeyboardButton(
             text=key,
-            callback_data=CostCallback(name='cost', cost=lines[key]).pack(),
+            callback_data=CostCallback(name='cost', pos_name=key, cost=lines[key]).pack(),
         )
         result.append([key_line])
 

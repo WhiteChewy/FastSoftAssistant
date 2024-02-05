@@ -207,10 +207,10 @@ async def print_overall(query: CallbackQuery, callback_data: CallbackData):
     user_name = query.from_user.username
     price = bill[user_name] if callback_data.text == 'overall' else bill[user_name]/2
     message_for_user = '```\n'
-    for pos, pos_price in bill[user_name]:
+    for pos in bill[user_name]:
         if pos == 'total':
             continue
-        message_for_user += f'{pos}: {pos_price} RUB\n'
+        message_for_user += f'{pos}: {bill[user_name][pos]} RUB\n'
     message_for_user += f'```\n *Итого*: {price}'
     await bot.send_message(query.message.chat.id, text=f'@{user_name}, ваш чек:\n{message_for_user}')
     bill.pop(user_name, '')

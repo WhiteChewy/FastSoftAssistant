@@ -39,7 +39,7 @@ async def command_start_handler(message: Message) -> None:
     :type message: aiogram.types.Message
     """
     await message.reply_sticker(HELLO)
-    await message.answer(HELLO_MESSAGE)
+    await message.answer(HELLO_MESSAGE, parse_mode='MarkdownV2')
 
 async def main() -> None:
     dp.message.middleware(AlbumMiddleware())

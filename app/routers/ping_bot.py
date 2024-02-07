@@ -11,9 +11,9 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 
 from core.bot import BOT_OBJ
-from core.texts import ADD_TO_BOT, ADD_TIMEOUT, ADD_TO_MYSELF
 from models import Users, Pings
 from core.database import Session
+from core.utils.tokens import add_one_ping
 
 load_dotenv()
 SMTHNG_WRONG = os.getenv('SMTHNG_WRONG')
@@ -21,9 +21,10 @@ LOGS_CHAT_ID = os.getenv('LOGS_CHAT')
 PING_BOT = Router()
 session = Session()
 bot = BOT_OBJ
+restricted_pings = {'слышь', 'бай', 'я', 'больше', 'не', 'уважаемый'}
 
 
-@PING_BOT.message(F.text.lower().regexp(r'(слыш)ь*(,)* бай я больше не |ув(а|о)жаемы(й|е) бай(б)* я больше не '))
+@PING_BOT.message(F.text.lower().regexp(r'(слыш)ь*(,)* бай(,)* я больше не |ув(а|о)жаемы(й|е)(,)* бай(б)*(,)* я больше не '))
 async def delete_ping(message: Message) -> None:
     """Deleting cast for user.
 
@@ -33,7 +34,8 @@ async def delete_ping(message: Message) -> None:
     :return: None
     :rtype: None
     """
-    message_without_punctuation = message.text.translate(str.maketrans('', '', string.punctuation))
+    text = message.text.lower()
+    message_without_punctuation = text.translate(str.maketrans('', '', string.punctuation))
     ping = message_without_punctuation.split()[5]
     request = select(Pings).join(Users, Pings.user_id==Users.id).where(
         Pings.ping_name==ping,
@@ -54,10 +56,10 @@ async def delete_ping(message: Message) -> None:
         await session.rollback()
         return
     
-    await message.reply(text=f'Готово, вы больше не {ping.ping_name}')
+    await message.reply(text=f'Готово, вы больше не {ping}')
 
 
-@PING_BOT.message(F.text.lower().regexp(r'(слыш)ь*(,)* бай(,)* я |ув(а|о)жаемы(й|е) бай(,)* я '))
+@PING_BOT.message(F.text.lower().regexp(r'(слыш)ь*(,)* бай(,)* я |ув(а|о)жаемы(й|е)(,)* бай(,)* я '))
 async def add_ping(message: Message) -> None:
     """Add ping cast to user.
     
@@ -67,9 +69,19 @@ async def add_ping(message: Message) -> None:
     :return: None
     :rtype: None
     """
-    message_without_punctuation = message.text.translate(str.maketrans('', '', string.punctuation))
-    words_without_command = message_without_punctuation.split()[3:]
-    ping = words_without_command[0]
+    text = message.text.lower()
+    message_without_punctuation = text.translate(str.maketrans('', '', string.punctuation))
+    pings = message_without_punctuation.split()[3:]
+    if 'бай' in pings:
+        await message.answer(text='Этот чат слишком тесен для двух Баев. Так что нет, ты не Бай.')
+        return
+    ping_set = {ping for ping in pings}
+    if not ping_set - restricted_pings:
+        msg =  '\n'.join(ping_set & restricted_pings)
+        await message.answer(text=f'Следующие имена находятся в списке запрещенных:\n{msg}.\nПожалуйста назначьте другие.')
+        return
+    elif ping_set - restricted_pings:
+        pings = [elem for elem in ping_set - restricted_pings]
     username = message.from_user.username if message.from_user.username else message.from_user.full_name
     user_telegram_id = message.from_user.id
 
@@ -105,27 +117,27 @@ async def add_ping(message: Message) -> None:
         await session.commit()
         user = await session.execute(select(Users).filter_by(telegram_id=user_telegram_id))
         user = user.scalars().first()
-    request = select(Pings).filter_by(
-        ping_name=ping,
-        user_id=user.id,
-    )
-    try:
-        result_query = await session.execute(request)
-    except SQLAlchemyError as error:
-        await message.reply_sticker(sticker=SMTHNG_WRONG)
-        await BOT_OBJ.send_message(
-            chat_id=LOGS_CHAT_ID,
-            text=f'SQLAlchemyError was rised when i tried to find ping: {ping} for {username} in DB.\nError: {error}',
-            )
-        return
+    for ping in pings:
+        request = select(Pings).filter_by(
+            ping_name=ping,
+            user_id=user.id,
+        )
+        try:
+            result_query = await session.execute(request)
+        except SQLAlchemyError as error:
+            await message.reply_sticker(sticker=SMTHNG_WRONG)
+            await BOT_OBJ.send_message(
+                chat_id=LOGS_CHAT_ID,
+                text=f'SQLAlchemyError was rised when i tried to find ping: {ping} for {username} in DB.\nError: {error}',
+                )
+            return
+    # Check if user already has this ping
     ping_find_req = select(Pings).filter_by(
         user_id=user.id,
-        ping_name=ping,
     )
-    # Check if user already has this ping
     try:
         ping_result = await session.execute(ping_find_req)
-        ping_result = ping_result.scalars().first()
+        ping_result = ping_result.scalars().all()
     except SQLAlchemyError as error:
         await message.reply_sticker(sticker=SMTHNG_WRONG)
         await BOT_OBJ.send_message(
@@ -134,42 +146,32 @@ async def add_ping(message: Message) -> None:
             )
         await session.rollback()
         return
-    if ping_result:
+    users_pings = {ping.ping_name for ping in ping_result}
+    pings_set = {ping for ping in pings}
+    if users_pings & pings_set:
+        all_pings = '\n'.join([ping for ping in (users_pings & pings_set)])
         await message.reply(
-            text=f'''Уважаемый, я уже знаю вас как {ping}. Для просмотра всех доступных кастов для вас введите
-```
+            text=f'''Уважаемый, я уже знаю вас как:\n{all_pings}\n\nДля просмотра всех доступных кастов для вас введите:
 Слышь, Бай, кто я?
-```
 или
-```
 /ping_show @никнейм
-```
 '''
         )
-        return
-    new_ping = Pings(
-        ping_name = ping,
-        user_id=user.id,
-        count=0,
-    )
-    # Add ping to database
-    try:
-        session.add(new_ping)
-        await session.commit()
-    except SQLAlchemyError as error:
-        await message.reply_sticker(sticker=SMTHNG_WRONG)
-        await BOT_OBJ.send_message(
-            chat_id=LOGS_CHAT_ID,
-            text=f'When i has been adding ping - {ping} for user - {username} to database SQLAlchemyError was rised.\nError: {error}',
-            )
-        await session.rollback()
-        return
+        ping_diff = pings_set - users_pings
+        if not ping_diff:
+            return
+        else:
+            pings = pings_set - users_pings
+    # Добавить пинг
+    for ping in pings:
+        await add_one_ping(ping=ping, user=user, message=message)
+    reply = '\n'.join(pings)
     await message.reply(
-        text=f'Приятно похнакомится, {ping}'
+        text=f'Приятно познакомится!\nТеперь вас знают как:{reply}'
     )
 
 
-@PING_BOT.message(F.text.lower().regexp(r'(слыш)ь*(,)* бай(,)* кто (@)*|ув(а|о)жаемы(й|е) бай(,)* кто (@)*'))
+@PING_BOT.message(F.text.lower().regexp(r'(слыш)ь*(,)* бай(,)* кто (@)*|ув(а|о)жаемы(й|е)(,)* бай(,)* кто (@)*'))
 async def show_ping(message: Message) -> None:
     """Show all pings for user.
 
@@ -179,7 +181,8 @@ async def show_ping(message: Message) -> None:
     :return: None
     :rtype: None
     """
-    message_without_punctuation = message.text.translate(str.maketrans('', '', string.punctuation))
+    text = message.text.lower()
+    message_without_punctuation = text.translate(str.maketrans('', '', string.punctuation))
     words_without_command = message_without_punctuation.split()[3:]
     who = words_without_command[0]
 
@@ -207,7 +210,7 @@ async def show_ping(message: Message) -> None:
     await message.answer(text=f'Уважаемый {username} известен как:\n'+msg_about)
 
 
-@PING_BOT.message(F.text.lower().regexp(r'(слыш)ь*(,)* |ув(а|о)жаемы(й|е) '))
+@PING_BOT.message(F.text.lower().regexp(r'(слыш)ь*(,)* |ув(а|о)жаемы(й|е)(,)* '))
 async def ping_someone(message: Message) -> None:
     """Cast someone by ping_name.
 
@@ -217,7 +220,8 @@ async def ping_someone(message: Message) -> None:
     :return: None
     :rtype: None
     """
-    message_without_punctuation = message.text.translate(str.maketrans('', '', string.punctuation))
+    text = message.text.lower()
+    message_without_punctuation = text.translate(str.maketrans('', '', string.punctuation))
     words_without_command = message_without_punctuation.split()[1:]
     words = set(words_without_command)
     all_pings = select(Pings)

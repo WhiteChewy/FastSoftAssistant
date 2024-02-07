@@ -157,4 +157,5 @@ def get_text_from_bill(image_dir: str=None, number_of_images: int=None) -> Dict[
     result.pop('Скидка', '')
     result.pop('Итого', '')
     result.pop('Всего', '')
+    result.pop('Ошибка в чеке', '')
     return result

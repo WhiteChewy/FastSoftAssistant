@@ -98,7 +98,10 @@ async def process_sticker(message: Message) -> None:
 
     rating_change = STICKERS_RATING[sticker_id]
     new_value = reply_user_record.social_rating + rating_change
-    request = update(SocialBot).where(SocialBot.user_id==reply_user_record.user_id).values(social_rating=new_value)
+    request = (update(SocialBot)
+                .where(SocialBot.user_id==reply_user_record.user_id)
+                .where(SocialBot.chat_id==message.chat.id)
+                .values(social_rating=new_value))
     await session.execute(request)
     await session.commit()
     if rating_change > 0:

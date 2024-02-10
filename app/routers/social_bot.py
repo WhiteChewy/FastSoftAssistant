@@ -56,7 +56,7 @@ async def get_chat_rating(message: Message) -> None:
     request = select(SocialBot).filter_by(chat_id=message.chat.id).order_by(SocialBot.social_rating.desc())
     result_query = await session.execute(request)
     rating_from_db = result_query.scalars().all()
-    entries = (f"{record.username}: {record.social_rating}" for record in rating_from_db)
+    entries = [f"{record.username}: {record.social_rating}" for record in rating_from_db]
 
     await message.reply('\n'.join(entries))
 

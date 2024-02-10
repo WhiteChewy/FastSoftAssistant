@@ -181,8 +181,7 @@ async def show_ping(message: Message) -> None:
     :return: None
     :rtype: None
     """
-    text = message.text.lower()
-    message_without_punctuation = text.translate(str.maketrans('', '', string.punctuation))
+    message_without_punctuation = message.text.translate(str.maketrans('', '', string.punctuation))
     words_without_command = message_without_punctuation.split()[3:]
     who = words_without_command[0]
 
@@ -206,7 +205,7 @@ async def show_ping(message: Message) -> None:
         await session.rollback()
         return
     
-    msg_about = ', '.join([f'{p.ping_name}: {p.count} раз' for p in rows])
+    msg_about = ',\n'.join([f'{p.ping_name}: {p.count} раз' for p in rows])
     await message.answer(text=f'Уважаемый {username} известен как:\n'+msg_about)
 
 

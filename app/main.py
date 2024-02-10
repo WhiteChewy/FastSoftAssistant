@@ -11,7 +11,7 @@ from aiogram import F
 from aiogram.types import Message
 
 from middlewares import AlbumMiddleware
-from core.texts.start_message import HELLO_MESSAGE
+from core.texts.start_message import HELLO_MESSAGE, ALL_COMMANDS
 
 from routers import all_routers
 from core.bot import BOT_OBJ
@@ -24,6 +24,7 @@ PER_PAGE = int(os.getenv('KEYBOARD_CAPACITY'))
 WORKING = os.getenv('WORKING_STCKR')
 WRONG_TYPE = os.getenv('WRONG_TYPE_STCKR')
 HELLO = os.getenv('HELLO_STICKER')
+ABOUT = os.getenv('ABOUT')
 # Bot object
 bot = BOT_OBJ
 # Dispatcher is father for handlers
@@ -40,6 +41,18 @@ async def command_start_handler(message: Message) -> None:
     """
     await message.reply_sticker(HELLO)
     await message.answer(HELLO_MESSAGE, parse_mode='MarkdownV2')
+
+
+@dp.message(F.text.lower().regexp(r'(слыш)ь*(,)* *бай(,)* *что *умее(шь|те)|ув(а|о)жаемы(й|е)(,)* *бай(,)* *что *умее(шь|те)'))
+async def all_commands(message: Message) -> None:
+    """All Bot commands
+    
+    :param message: Message object
+    :type message: aiogram.types.Message
+    """
+    await message.reply_sticker(ABOUT)
+    await message.answer(ALL_COMMANDS, parse_mode='HTML')
+
 
 async def main() -> None:
     dp.message.middleware(AlbumMiddleware())
